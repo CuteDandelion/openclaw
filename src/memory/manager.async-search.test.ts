@@ -1,9 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import { getMemorySearchManager, type MemoryIndexManager } from "./index.js";
 
 const embedBatch = vi.fn(async () => []);
@@ -75,10 +73,19 @@ describe("memory search async sync", () => {
     const pending = new Promise<void>(() => {});
     (manager as unknown as { sync: () => Promise<void> }).sync = vi.fn(async () => pending);
 
-    const resolved = await Promise.race([
-      manager.search("hello").then(() => true),
-      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 1000)),
-    ]);
+    const resolved = await new Promise<boolean>((resolve, reject) => {
+      const timeout = setTimeout(() => resolve(false), 1000);
+      void manager
+        .search("hello")
+        .then(() => {
+          clearTimeout(timeout);
+          resolve(true);
+        })
+        .catch((err) => {
+          clearTimeout(timeout);
+          reject(err);
+        });
+    });
     expect(resolved).toBe(true);
   });
 });
